@@ -27,10 +27,10 @@ from bot.utils.helpers import (
     create_referral_link,
     get_random_server_location,
     generate_config_filename,
-    calculate_referral_bonus
+    calculate_referral_bonus,
 )
 from bot.utils.payments import payment_manager, PaymentError
-from locales.ru import get_message, format_price_per_month, format_savings
+from locales.ru import get_message, get_image, format_price_per_month, format_savings
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +50,13 @@ db_manager = DatabaseManager(Config.DATABASE_URL)
 db_manager.create_tables()
 
 
-def get_or_create_user(telegram_user) -> User:
+def get_or_create_user(telegram_user, session=None) -> User:
     """Get or create user in database"""
-    session = db_manager.get_session()
+    own_session = False
+    if session is None:
+        session = db_manager.get_session()
+        own_session = True
+
     try:
         user = session.query(User).filter_by(telegram_id=telegram_user.id).first()
 
@@ -77,19 +81,19 @@ def get_or_create_user(telegram_user) -> User:
 
         return user
     finally:
-        session.close()
+        if own_session:
+            session.close()
 
 
 @router.message(Command("start"))
-async def start_command(message: Message, command: Command = None) -> None:
+async def start_command(message: Message, session, command: Command = None) -> None:
     """Handle /start command"""
-    user = get_or_create_user(message.from_user)
+    user = get_or_create_user(message.from_user, session)
 
     # Handle referral code from deep link
     if command and command.args:
         referral_code = command.args
         if user.referrer_id is None:
-            session = db_manager.get_session()
             try:
                 referrer = (
                     session.query(User).filter_by(referral_code=referral_code).first()
@@ -110,8 +114,8 @@ async def start_command(message: Message, command: Command = None) -> None:
                         )
                     except Exception as e:
                         logger.warning(f"Failed to notify referrer: {e}")
-            finally:
-                session.close()
+            except Exception as e:
+                logger.error(f"Referral processing error: {e}")
 
     # Check if returning user
     is_returning = user.created_at < datetime.utcnow() - timedelta(hours=1)
@@ -144,12 +148,24 @@ async def start_command(message: Message, command: Command = None) -> None:
 
     if is_returning:
         message_text = get_message("welcome_back", name=user.first_name or "друг")
+        message_key = "welcome_back"
     else:
         message_text = get_message("welcome")
+        message_key = "welcome"
 
-    await message.answer(
-        message_text, reply_markup=builder.as_markup(), parse_mode="HTML"
-    )
+    image_url = get_image(message_key) or get_image("welcome")
+
+    if image_url:
+        await message.answer_photo(
+            photo=image_url,
+            caption=message_text,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML",
+        )
+    else:
+        await message.answer(
+            message_text, reply_markup=builder.as_markup(), parse_mode="HTML"
+        )
 
 
 @router.callback_query(F.data == "buy_vpn")
@@ -253,7 +269,9 @@ async def select_payment_method(
 @router.callback_query(
     F.data.startswith("pay_"), PurchaseStates.selecting_payment_method
 )
-async def process_payment(callback_query: CallbackQuery, state: FSMContext) -> None:
+async def process_payment(
+    callback_query: CallbackQuery, session, state: FSMContext
+) -> None:
     """Process payment"""
     await callback_query.answer("💳 Создаем счет для оплаты...")
 
@@ -267,10 +285,9 @@ async def process_payment(callback_query: CallbackQuery, state: FSMContext) -> N
         return
 
     plan = SUBSCRIPTION_PLANS[plan_type]
-    user = get_or_create_user(callback_query.from_user)
+    user = get_or_create_user(callback_query.from_user, session)
 
     # Create payment record
-    session = db_manager.get_session()
     try:
         payment = Payment(
             user_id=user.id,
@@ -340,20 +357,19 @@ async def process_payment(callback_query: CallbackQuery, state: FSMContext) -> N
         logger.error(f"Payment creation error: {e}")
         await callback_query.message.edit_text(get_message("error_general"))
         await state.clear()
-    finally:
-        session.close()
 
 
 @router.callback_query(
     F.data.startswith("verify_payment_"), PurchaseStates.waiting_payment
 )
-async def verify_payment(callback_query: CallbackQuery, state: FSMContext) -> None:
+async def verify_payment(
+    callback_query: CallbackQuery, session, state: FSMContext
+) -> None:
     """Verify and complete payment"""
     await callback_query.answer("🔄 Проверяем статус платежа...")
 
     payment_id = int(callback_query.data.replace("verify_payment_", ""))
 
-    session = db_manager.get_session()
     try:
         payment = session.query(Payment).filter_by(id=payment_id).first()
         if not payment:
@@ -506,16 +522,14 @@ async def verify_payment(callback_query: CallbackQuery, state: FSMContext) -> No
         logger.error(f"Payment verification error: {e}")
         await callback_query.message.edit_text(get_message("error_general"))
         await state.clear()
-    finally:
-        session.close()
 
 
 @router.callback_query(F.data == "profile")
-async def show_profile(callback_query: CallbackQuery) -> None:
+async def show_profile(callback_query: CallbackQuery, session) -> None:
     """Show user profile"""
     await callback_query.answer()
 
-    user = get_or_create_user(callback_query.from_user)
+    user = get_or_create_user(callback_query.from_user, session)
 
     # Get subscription info
     if user.has_active_subscription:
@@ -546,27 +560,39 @@ async def show_profile(callback_query: CallbackQuery) -> None:
         )
     )
 
-    await callback_query.message.edit_text(
-        text=get_message(
-            "profile_info",
-            user_id=user.telegram_id,
-            full_name=user.full_name,
-            created_at=format_date(user.created_at),
-            total_spent=user.total_spent,
-            subscription_info=subscription_info,
-            referral_code=user.referral_code,
-        ),
-        reply_markup=builder.as_markup(),
-        parse_mode="HTML",
+    image_url = get_image("profile_info")
+    message_text = get_message(
+        "profile_info",
+        user_id=user.telegram_id,
+        full_name=user.full_name,
+        created_at=format_date(user.created_at),
+        total_spent=user.total_spent,
+        subscription_info=subscription_info,
+        referral_code=user.referral_code,
     )
+
+    if image_url:
+        await callback_query.message.answer_photo(
+            photo=image_url,
+            caption=message_text,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML",
+        )
+        await callback_query.message.delete()
+    else:
+        await callback_query.message.edit_text(
+            text=message_text,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML",
+        )
 
 
 @router.callback_query(F.data == "my_config")
-async def show_my_config(callback_query: CallbackQuery) -> None:
+async def show_my_config(callback_query: CallbackQuery, session) -> None:
     """Show user's VPN configuration"""
     await callback_query.answer()
 
-    user = get_or_create_user(callback_query.from_user)
+    user = get_or_create_user(callback_query.from_user, session)
 
     if not user.has_active_subscription:
         await callback_query.message.edit_text(get_message("error_no_subscription"))
@@ -599,11 +625,11 @@ async def show_my_config(callback_query: CallbackQuery) -> None:
 
 
 @router.callback_query(F.data == "referral")
-async def show_referral_info(callback_query: CallbackQuery) -> None:
+async def show_referral_info(callback_query: CallbackQuery, session) -> None:
     """Show referral program info"""
     await callback_query.answer()
 
-    user = get_or_create_user(callback_query.from_user)
+    user = get_or_create_user(callback_query.from_user, session)
 
     # Get bot username for referral link
     bot_info = await callback_query.bot.get_me()
@@ -660,9 +686,21 @@ async def show_help(callback_query: CallbackQuery) -> None:
         )
     )
 
-    await callback_query.message.edit_text(
-        text=get_message("help"), reply_markup=builder.as_markup(), parse_mode="HTML"
-    )
+    image_url = get_image("help")
+    message_text = get_message("help")
+
+    if image_url:
+        await callback_query.message.answer_photo(
+            photo=image_url,
+            caption=message_text,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML",
+        )
+        await callback_query.message.delete()
+    else:
+        await callback_query.message.edit_text(
+            text=message_text, reply_markup=builder.as_markup(), parse_mode="HTML"
+        )
 
 
 @router.callback_query(F.data == "support")
@@ -683,18 +721,30 @@ async def show_support(callback_query: CallbackQuery) -> None:
         )
     )
 
-    await callback_query.message.edit_text(
-        text=get_message("support_info", support_username=Config.SUPPORT_USERNAME),
-        reply_markup=builder.as_markup(),
-        parse_mode="HTML",
-    )
+    image_url = get_image("support_info")
+    message_text = get_message("support_info", support_username=Config.SUPPORT_USERNAME)
+
+    if image_url:
+        await callback_query.message.answer_photo(
+            photo=image_url,
+            caption=message_text,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML",
+        )
+        await callback_query.message.delete()
+    else:
+        await callback_query.message.edit_text(
+            text=message_text,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML",
+        )
 
 
 @router.callback_query(F.data == "main_menu")
-async def main_menu_callback(callback_query: CallbackQuery) -> None:
+async def main_menu_callback(callback_query: CallbackQuery, session) -> None:
     """Return to main menu via callback"""
     await callback_query.answer()
-    user = get_or_create_user(callback_query.from_user)
+    user = get_or_create_user(callback_query.from_user, session)
 
     builder = InlineKeyboardBuilder()
     builder.row(
@@ -722,10 +772,20 @@ async def main_menu_callback(callback_query: CallbackQuery) -> None:
     )
 
     message_text = get_message("welcome_back", name=user.first_name or "друг")
+    image_url = get_image("welcome_back") or get_image("welcome")
 
-    await callback_query.message.edit_text(
-        text=message_text, reply_markup=builder.as_markup(), parse_mode="HTML"
-    )
+    if image_url:
+        await callback_query.message.answer_photo(
+            photo=image_url,
+            caption=message_text,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML",
+        )
+        await callback_query.message.delete()
+    else:
+        await callback_query.message.edit_text(
+            text=message_text, reply_markup=builder.as_markup(), parse_mode="HTML"
+        )
 
 
 async def show_main_menu_internal(message: Message, user: User) -> None:

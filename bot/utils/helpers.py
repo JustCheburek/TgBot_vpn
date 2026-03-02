@@ -14,16 +14,14 @@ import base64
 logger = logging.getLogger(__name__)
 
 
-def setup_logging():
+def setup_logging(LOG_LEVEL: str):
     """Setup logging configuration"""
-    from bot.config.settings import Config
-    
     # Create logs directory if not exists
     os.makedirs('logs', exist_ok=True)
     
     # Configure logging
     log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    log_level = getattr(logging, Config.LOG_LEVEL.upper(), logging.INFO)
+    log_level = getattr(logging, LOG_LEVEL.upper(), logging.INFO)
     
     # File handler
     file_handler = logging.FileHandler(

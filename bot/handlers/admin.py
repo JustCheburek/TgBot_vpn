@@ -44,7 +44,7 @@ db_manager = DatabaseManager(Config.DATABASE_URL)
 
 
 @router.message(Command("admin"))
-async def admin_panel(message: Message) -> None:
+async def admin_panel(message: Message, session) -> None:
     """Show admin panel"""
     user_id = message.from_user.id
 
@@ -52,7 +52,6 @@ async def admin_panel(message: Message) -> None:
         await message.answer(get_message("admin_not_authorized"))
         return
 
-    session = db_manager.get_session()
     try:
         # Get comprehensive statistics
         total_users = session.query(User).count()
@@ -131,13 +130,14 @@ async def admin_panel(message: Message) -> None:
 
         log_admin_action(user_id, "accessed_admin_panel")
 
-    finally:
-        session.close()
+    except Exception as e:
+        logger.error(f"Admin panel error: {e}")
+        await message.answer("❌ Ошибка при открытии админ-панели")
 
 
 @router.callback_query(F.data.startswith("admin_"))
 async def admin_callback_handler(
-    callback_query: CallbackQuery, state: FSMContext
+    callback_query: CallbackQuery, session, state: FSMContext
 ) -> None:
     """Handle admin callback queries"""
     user_id = callback_query.from_user.id
@@ -151,22 +151,22 @@ async def admin_callback_handler(
 
     if action == "refresh":
         await callback_query.answer()
-        await admin_panel_refresh(callback_query)
+        await admin_panel_refresh(callback_query, session)
     elif action == "users":
         await callback_query.answer()
-        await admin_users_list(callback_query, state)
+        await admin_users_list(callback_query, session, state)
     elif action == "stats":
         await callback_query.answer()
-        await admin_detailed_stats(callback_query)
+        await admin_detailed_stats(callback_query, session)
     elif action == "keys":
         await callback_query.answer()
-        await admin_keys_management(callback_query)
+        await admin_keys_management(callback_query, session)
     elif action == "payments":
         await callback_query.answer()
-        await admin_payments_list(callback_query)
+        await admin_payments_list(callback_query, session)
     elif action == "broadcast":
         await callback_query.answer()
-        await admin_broadcast_start(callback_query, state)
+        await admin_broadcast_start(callback_query, session, state)
     elif action == "logs":
         await callback_query.answer()
         await admin_logs_view(callback_query)
@@ -175,21 +175,18 @@ async def admin_callback_handler(
         await admin_settings(callback_query)
     elif action == "back":
         await callback_query.answer()
-        await admin_back_to_panel(callback_query, state)
-    elif action == "broadcast_confirm":
-        await admin_broadcast_confirm(callback_query, state)
+        await admin_back_to_panel(callback_query, session, state)
     elif action.startswith("users_page_"):
         await callback_query.answer()
         page = int(action.replace("users_page_", ""))
         await state.update_data(admin_users_page=page)
-        await admin_users_list(callback_query, state)
+        await admin_users_list(callback_query, session, state)
 
 
-async def admin_panel_refresh(callback_query: CallbackQuery) -> None:
+async def admin_panel_refresh(callback_query: CallbackQuery, session) -> None:
     """Refresh admin panel"""
     user_id = callback_query.from_user.id
 
-    session = db_manager.get_session()
     try:
         # Get fresh statistics
         total_users = session.query(User).count()
@@ -262,18 +259,20 @@ async def admin_panel_refresh(callback_query: CallbackQuery) -> None:
 
         log_admin_action(user_id, "refreshed_admin_panel")
 
-    finally:
-        session.close()
+    except Exception as e:
+        logger.error(f"Admin panel refresh error: {e}")
+        await callback_query.message.edit_text("❌ Ошибка при обновлении панели")
 
 
-async def admin_users_list(callback_query: CallbackQuery, state: FSMContext) -> None:
+async def admin_users_list(
+    callback_query: CallbackQuery, session, state: FSMContext
+) -> None:
     """Show users list for admin"""
     data = await state.get_data()
     page = data.get("admin_users_page", 0)
     limit = 10
     offset = page * limit
 
-    session = db_manager.get_session()
     try:
         users = (
             session.query(User)
@@ -334,14 +333,15 @@ async def admin_users_list(callback_query: CallbackQuery, state: FSMContext) -> 
         await callback_query.message.edit_text(
             text=users_text, reply_markup=builder.as_markup(), parse_mode="HTML"
         )
+    except Exception as e:
+        logger.error(f"Error in admin_users_list: {e}")
+        await callback_query.message.edit_text(
+            "❌ Ошибка при получении списка пользователей"
+        )
 
-    finally:
-        session.close()
 
-
-async def admin_detailed_stats(callback_query: CallbackQuery) -> None:
+async def admin_detailed_stats(callback_query: CallbackQuery, session) -> None:
     """Show detailed statistics"""
-    session = db_manager.get_session()
     try:
         stats = StatsCalculator.calculate_daily_stats()
 
@@ -398,7 +398,7 @@ async def admin_detailed_stats(callback_query: CallbackQuery) -> None:
             stats_text += f"   • {plan_name}: {count}\n"
         stats_text += "\n"
 
-        stats_text += f"💰 <b>Доходы:</b>\n"
+        stats_text += "💰 <b>Доходы:</b>\n"
         stats_text += f"   • Сегодня: {stats['daily_revenue']:.0f} ₽\n"
         stats_text += f"   • За неделю: {weekly_revenue:.0f} ₽\n"
         stats_text += f"   • Всего: {total_revenue:.0f} ₽\n"
@@ -430,14 +430,13 @@ async def admin_detailed_stats(callback_query: CallbackQuery) -> None:
         )
 
         log_admin_action(callback_query.from_user.id, "viewed_detailed_stats")
+    except Exception as e:
+        logger.error(f"Error in admin_detailed_stats: {e}")
+        await callback_query.message.edit_text("❌ Ошибка при получении статистики")
 
-    finally:
-        session.close()
 
-
-async def admin_keys_management(callback_query: CallbackQuery) -> None:
+async def admin_keys_management(callback_query: CallbackQuery, session) -> None:
     """Manage VPN keys"""
-    session = db_manager.get_session()
     try:
         total_keys = session.query(VPNKey).count()
         available_keys = session.query(VPNKey).filter(~VPNKey.is_used).count()
@@ -478,14 +477,13 @@ async def admin_keys_management(callback_query: CallbackQuery) -> None:
         await callback_query.message.edit_text(
             text=keys_text, reply_markup=builder.as_markup(), parse_mode="HTML"
         )
+    except Exception as e:
+        logger.error(f"Error in admin_keys_management: {e}")
+        await callback_query.message.edit_text("❌ Ошибка при управлении ключами")
 
-    finally:
-        session.close()
 
-
-async def admin_payments_list(callback_query: CallbackQuery) -> None:
+async def admin_payments_list(callback_query: CallbackQuery, session) -> None:
     """Show recent payments"""
-    session = db_manager.get_session()
     try:
         payments = (
             session.query(Payment).order_by(desc(Payment.created_at)).limit(20).all()
@@ -529,16 +527,17 @@ async def admin_payments_list(callback_query: CallbackQuery) -> None:
         await callback_query.message.edit_text(
             text=payments_text, reply_markup=builder.as_markup(), parse_mode="HTML"
         )
-
-    finally:
-        session.close()
+    except Exception as e:
+        logger.error(f"Error in admin_payments_list: {e}")
+        await callback_query.message.edit_text(
+            "❌ Ошибка при получении списка платежей"
+        )
 
 
 async def admin_broadcast_start(
-    callback_query: CallbackQuery, state: FSMContext
+    callback_query: CallbackQuery, session, state: FSMContext
 ) -> None:
     """Start broadcast message creation"""
-    session = db_manager.get_session()
     try:
         total_users = session.query(User).count()
         active_users = (
@@ -561,13 +560,15 @@ async def admin_broadcast_start(
         )
 
         await state.set_state(AdminStates.waiting_broadcast_message)
-
-    finally:
-        session.close()
+    except Exception as e:
+        logger.error(f"Error in admin_broadcast_start: {e}")
+        await callback_query.message.edit_text("❌ Ошибка при запуске рассылки")
 
 
 @router.message(AdminStates.waiting_broadcast_message, F.text)
-async def handle_broadcast_message(message: Message, state: FSMContext) -> None:
+async def handle_broadcast_message(
+    message: Message, session, state: FSMContext
+) -> None:
     """Handle broadcast message from admin"""
     if not is_admin(message.from_user.id):
         return
@@ -575,7 +576,6 @@ async def handle_broadcast_message(message: Message, state: FSMContext) -> None:
     broadcast_message = message.text
     await state.update_data(broadcast_message=broadcast_message)
 
-    session = db_manager.get_session()
     try:
         total_users = session.query(User).count()
 
@@ -594,13 +594,13 @@ async def handle_broadcast_message(message: Message, state: FSMContext) -> None:
         await message.answer(
             text=confirm_text, reply_markup=builder.as_markup(), parse_mode="HTML"
         )
-
-    finally:
-        session.close()
+    except Exception as e:
+        logger.error(f"Error in handle_broadcast_message: {e}")
+        await message.answer("❌ Ошибка при обработке сообщения рассылки")
 
 
 async def admin_broadcast_confirm(
-    callback_query: CallbackQuery, state: FSMContext
+    callback_query: CallbackQuery, session, state: FSMContext
 ) -> None:
     """Confirm and execute broadcast"""
     await callback_query.answer("📢 Начинаем рассылку...")
@@ -613,7 +613,6 @@ async def admin_broadcast_confirm(
         await state.clear()
         return
 
-    session = db_manager.get_session()
     try:
         users = session.query(User).all()
         total_users = len(users)
@@ -665,15 +664,10 @@ async def admin_broadcast_confirm(
             text=success_text, reply_markup=builder.as_markup(), parse_mode="HTML"
         )
 
-        log_admin_action(
-            callback_query.from_user.id,
-            "broadcast_sent",
-            details=f"Sent to {sent_count}/{total_users} users",
-        )
         await state.clear()
-
-    finally:
-        session.close()
+    except Exception as e:
+        logger.error(f"Error in admin_broadcast_confirm: {e}")
+        await callback_query.message.edit_text("❌ Ошибка при выполнении рассылки")
 
 
 async def admin_logs_view(callback_query: CallbackQuery) -> None:
@@ -756,7 +750,9 @@ async def admin_settings(callback_query: CallbackQuery) -> None:
     )
 
 
-async def admin_back_to_panel(callback_query: CallbackQuery, state: FSMContext) -> None:
+async def admin_back_to_panel(
+    callback_query: CallbackQuery, session, state: FSMContext
+) -> None:
     """Return to admin panel"""
     await state.clear()
-    await admin_panel_refresh(callback_query)
+    await admin_panel_refresh(callback_query, session)

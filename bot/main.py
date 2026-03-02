@@ -10,6 +10,7 @@ from bot.config.settings import Config
 from bot.models.database import DatabaseManager
 from bot.handlers.main import router as main_router
 from bot.handlers.admin import router as admin_router
+from bot.middlewares.db import DbSessionMiddleware
 from bot.utils.helpers import setup_logging
 
 # Configure logging
@@ -32,6 +33,9 @@ async def main() -> None:
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
 
+    # Register middleware
+    dp.update.middleware(DbSessionMiddleware(db_manager))
+
     # Register routers
     dp.include_router(admin_router)
     dp.include_router(main_router)
@@ -44,12 +48,22 @@ async def main() -> None:
         bot_info = await bot.get_me()
         logger.info(f"Bot started: @{bot_info.username}")
 
+        # Send startup message to admins
+        startup_message = (
+            "🤖 <b>VPN Bot запущен успешно!</b>\n\n"
+            f"🆔 Бот: @{bot_info.username}\n"
+            f"📅 Время запуска: {logging.Formatter().formatTime(logging.LogRecord('', 0, '', 0, '', (), None))}\n"
+            f"⚙️ Режим отладки: {'✅' if Config.DEBUG else '❌'}\n"
+            f"🗄️ База данных: {'✅ Подключена' if db_manager else '❌ Ошибка'}\n\n"
+            "🎯 Бот готов к работе с пользователями!"
+        )
+
         # Notify admins
         for admin_id in Config.ADMIN_IDS:
             try:
                 await bot.send_message(
                     chat_id=admin_id,
-                    text=f"🤖 <b>VPN Bot запущен!</b>\n\n🆔 Бот: @{bot_info.username}",
+                    text=startup_message,
                     parse_mode="HTML",
                 )
             except Exception as e:
