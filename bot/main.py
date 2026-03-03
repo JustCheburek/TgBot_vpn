@@ -72,7 +72,7 @@ async def main() -> None:
     @dp.shutdown()
     async def on_shutdown():
         logger.info("Bot is shutting down...")
-        await db_manager.close_all_connections()
+        await db_manager.close()
 
     # Start polling
     try:

@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timedelta
 
 from aiogram import Router, F
-from aiogram.filters import Command, StateFilter
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
@@ -168,9 +168,78 @@ async def start_command(message: Message, session, command: Command = None) -> N
         )
 
 
+async def show_main_menu(
+    callback_query: CallbackQuery, session, state: FSMContext = None
+):
+    """Return to main menu"""
+    await callback_query.answer()
+    if state:
+        await state.clear()
+
+    user = get_or_create_user(callback_query.from_user, session)
+
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text=get_message("btn_buy_vpn"), callback_data="buy_vpn")
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text=get_message("btn_my_profile"), callback_data="profile"
+        )
+    )
+
+    if user.has_active_subscription:
+        builder.row(
+            InlineKeyboardButton(
+                text=get_message("btn_config"), callback_data="my_config"
+            )
+        )
+
+    builder.row(
+        InlineKeyboardButton(text=get_message("btn_help"), callback_data="help"),
+        InlineKeyboardButton(text=get_message("btn_support"), callback_data="support"),
+    )
+    builder.row(
+        InlineKeyboardButton(text=get_message("btn_referral"), callback_data="referral")
+    )
+
+    message_text = get_message("welcome_back", name=user.first_name or "друг")
+    image_url = get_image("welcome_back") or get_image("welcome")
+
+    # If the current message has a photo, we can try to edit its caption or send a new one
+    if callback_query.message.photo:
+        if image_url:
+            # We can't easily change the photo URL in edit_media without complex setup,
+            # so we just update caption if it's the same "type" of message
+            await callback_query.message.edit_caption(
+                caption=message_text,
+                reply_markup=builder.as_markup(),
+                parse_mode="HTML",
+            )
+        else:
+            # If no photo needed, delete old and send new text
+            await callback_query.message.delete()
+            await callback_query.message.answer(
+                text=message_text, reply_markup=builder.as_markup(), parse_mode="HTML"
+            )
+    else:
+        # If it was a text message
+        if image_url:
+            await callback_query.message.delete()
+            await callback_query.message.answer_photo(
+                photo=image_url,
+                caption=message_text,
+                reply_markup=builder.as_markup(),
+                parse_mode="HTML",
+            )
+        else:
+            await callback_query.message.edit_text(
+                text=message_text, reply_markup=builder.as_markup(), parse_mode="HTML"
+            )
+
+
 @router.callback_query(F.data == "buy_vpn")
-@router.callback_query(F.data == "main_menu", StateFilter(PurchaseStates))
-async def show_plans(callback_query: CallbackQuery, state: FSMContext) -> None:
+async def show_plans(callback_query: CallbackQuery, session, state: FSMContext) -> None:
     """Show subscription plans"""
     await callback_query.answer()
 
@@ -214,9 +283,19 @@ async def show_plans(callback_query: CallbackQuery, state: FSMContext) -> None:
         InlineKeyboardButton(text=get_message("btn_back"), callback_data="main_menu")
     )
 
-    await callback_query.message.edit_text(
-        text=message_text, reply_markup=builder.as_markup(), parse_mode="HTML"
-    )
+    try:
+        if callback_query.message.photo:
+            await callback_query.message.delete()
+            await callback_query.message.answer(
+                text=message_text, reply_markup=builder.as_markup(), parse_mode="HTML"
+            )
+        else:
+            await callback_query.message.edit_text(
+                text=message_text, reply_markup=builder.as_markup(), parse_mode="HTML"
+            )
+    except Exception as e:
+        if "message is not modified" not in str(e):
+            logger.error(f"Error showing plans: {e}")
 
 
 @router.callback_query(F.data.startswith("plan_"), PurchaseStates.selecting_plan)
@@ -524,6 +603,14 @@ async def verify_payment(
         await state.clear()
 
 
+@router.callback_query(F.data == "main_menu")
+async def main_menu_handler(
+    callback_query: CallbackQuery, session, state: FSMContext
+) -> None:
+    """Handle main menu button"""
+    await show_main_menu(callback_query, session, state)
+
+
 @router.callback_query(F.data == "profile")
 async def show_profile(callback_query: CallbackQuery, session) -> None:
     """Show user profile"""
@@ -572,19 +659,32 @@ async def show_profile(callback_query: CallbackQuery, session) -> None:
     )
 
     if image_url:
-        await callback_query.message.answer_photo(
-            photo=image_url,
-            caption=message_text,
-            reply_markup=builder.as_markup(),
-            parse_mode="HTML",
-        )
-        await callback_query.message.delete()
+        if callback_query.message.photo:
+            await callback_query.message.edit_caption(
+                caption=message_text,
+                reply_markup=builder.as_markup(),
+                parse_mode="HTML",
+            )
+        else:
+            await callback_query.message.delete()
+            await callback_query.message.answer_photo(
+                photo=image_url,
+                caption=message_text,
+                reply_markup=builder.as_markup(),
+                parse_mode="HTML",
+            )
     else:
-        await callback_query.message.edit_text(
-            text=message_text,
-            reply_markup=builder.as_markup(),
-            parse_mode="HTML",
-        )
+        if callback_query.message.photo:
+            await callback_query.message.delete()
+            await callback_query.message.answer(
+                text=message_text, reply_markup=builder.as_markup(), parse_mode="HTML"
+            )
+        else:
+            await callback_query.message.edit_text(
+                text=message_text,
+                reply_markup=builder.as_markup(),
+                parse_mode="HTML",
+            )
 
 
 @router.callback_query(F.data == "my_config")
@@ -690,17 +790,30 @@ async def show_help(callback_query: CallbackQuery) -> None:
     message_text = get_message("help")
 
     if image_url:
-        await callback_query.message.answer_photo(
-            photo=image_url,
-            caption=message_text,
-            reply_markup=builder.as_markup(),
-            parse_mode="HTML",
-        )
-        await callback_query.message.delete()
+        if callback_query.message.photo:
+            await callback_query.message.edit_caption(
+                caption=message_text,
+                reply_markup=builder.as_markup(),
+                parse_mode="HTML",
+            )
+        else:
+            await callback_query.message.delete()
+            await callback_query.message.answer_photo(
+                photo=image_url,
+                caption=message_text,
+                reply_markup=builder.as_markup(),
+                parse_mode="HTML",
+            )
     else:
-        await callback_query.message.edit_text(
-            text=message_text, reply_markup=builder.as_markup(), parse_mode="HTML"
-        )
+        if callback_query.message.photo:
+            await callback_query.message.delete()
+            await callback_query.message.answer(
+                text=message_text, reply_markup=builder.as_markup(), parse_mode="HTML"
+            )
+        else:
+            await callback_query.message.edit_text(
+                text=message_text, reply_markup=builder.as_markup(), parse_mode="HTML"
+            )
 
 
 @router.callback_query(F.data == "support")
@@ -725,67 +838,32 @@ async def show_support(callback_query: CallbackQuery) -> None:
     message_text = get_message("support_info", support_username=Config.SUPPORT_USERNAME)
 
     if image_url:
-        await callback_query.message.answer_photo(
-            photo=image_url,
-            caption=message_text,
-            reply_markup=builder.as_markup(),
-            parse_mode="HTML",
-        )
-        await callback_query.message.delete()
-    else:
-        await callback_query.message.edit_text(
-            text=message_text,
-            reply_markup=builder.as_markup(),
-            parse_mode="HTML",
-        )
-
-
-@router.callback_query(F.data == "main_menu")
-async def main_menu_callback(callback_query: CallbackQuery, session) -> None:
-    """Return to main menu via callback"""
-    await callback_query.answer()
-    user = get_or_create_user(callback_query.from_user, session)
-
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text=get_message("btn_buy_vpn"), callback_data="buy_vpn")
-    )
-    builder.row(
-        InlineKeyboardButton(
-            text=get_message("btn_my_profile"), callback_data="profile"
-        )
-    )
-
-    if user.has_active_subscription:
-        builder.row(
-            InlineKeyboardButton(
-                text=get_message("btn_config"), callback_data="my_config"
+        if callback_query.message.photo:
+            await callback_query.message.edit_caption(
+                caption=message_text,
+                reply_markup=builder.as_markup(),
+                parse_mode="HTML",
             )
-        )
-
-    builder.row(
-        InlineKeyboardButton(text=get_message("btn_help"), callback_data="help"),
-        InlineKeyboardButton(text=get_message("btn_support"), callback_data="support"),
-    )
-    builder.row(
-        InlineKeyboardButton(text=get_message("btn_referral"), callback_data="referral")
-    )
-
-    message_text = get_message("welcome_back", name=user.first_name or "друг")
-    image_url = get_image("welcome_back") or get_image("welcome")
-
-    if image_url:
-        await callback_query.message.answer_photo(
-            photo=image_url,
-            caption=message_text,
-            reply_markup=builder.as_markup(),
-            parse_mode="HTML",
-        )
-        await callback_query.message.delete()
+        else:
+            await callback_query.message.delete()
+            await callback_query.message.answer_photo(
+                photo=image_url,
+                caption=message_text,
+                reply_markup=builder.as_markup(),
+                parse_mode="HTML",
+            )
     else:
-        await callback_query.message.edit_text(
-            text=message_text, reply_markup=builder.as_markup(), parse_mode="HTML"
-        )
+        if callback_query.message.photo:
+            await callback_query.message.delete()
+            await callback_query.message.answer(
+                text=message_text, reply_markup=builder.as_markup(), parse_mode="HTML"
+            )
+        else:
+            await callback_query.message.edit_text(
+                text=message_text,
+                reply_markup=builder.as_markup(),
+                parse_mode="HTML",
+            )
 
 
 async def show_main_menu_internal(message: Message, user: User) -> None:

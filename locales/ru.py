@@ -3,16 +3,16 @@
 MESSAGES = {
     # Welcome and basic messages
     "welcome": (
-        "🎉 Добро пожаловать в MineBridge VPN!\n\n"
+        "🎉 Добро пожаловать в Макс Спид VPN!\n\n"
         "🚀 Самый дешёвый и надежный VPN для русскоязычной аудитории!\n\n"
         "🔒 Наши преимущества:\n"
-        "• ⚡ Высокая скорость до 100 Мбит/с\n"
-        # "• 🌍 Серверы в 50+ странах\n"
-        # "• 🔐 Военное шифрование AES-256\n"
+        "• ⚡ Высокая скорость до 1 Гбит/с\n"
+        "• 🌍 Серверы в 3 странах\n"
+         "• 🔐 Военное шифрование AES-256\n"
         "• 📱 Поддержка всех устройств\n"
-        # "• 🛡️ Защита от утечек DNS\n"
+        "• 🛡️ Защита от утечек DNS\n"
         "• 🎯 Обход любых блокировок\n"
-        # "• 💬 Техподдержка 24/7\n\n"
+        "• 💬 Техподдержка 24/7\n\n"
         # "🎁 Специальные цены для российских пользователей!\n\n"
         "Выберите действие:"
     ),
@@ -101,7 +101,7 @@ MESSAGES = {
         "💰 Потрачено всего: {total_spent} ₽\n\n"
         "📱 Текущая подписка:\n"
         "{subscription_info}\n\n"
-        "🎁 Реферальный код: `{referral_code}`"
+        "🎁 Реферальный код: <code>{referral_code}</code>"
     ),
     "subscription_active": (
         "✅ АКТИВНА\n"
@@ -138,7 +138,7 @@ MESSAGES = {
         "💵 Заработано: {earned_amount} ₽\n"
         "💳 Доступно к выводу: {available_balance} ₽\n\n"
         "🔗 Ваша реферальная ссылка:\n"
-        "`{referral_link}`\n\n"
+        "<code>{referral_link}</code>\n\n"
         "💡 Условия программы:\n"
         "• 10% с каждой покупки друга\n"
         "• Минимальная сумма вывода: {min_payout} ₽\n"
@@ -162,9 +162,7 @@ MESSAGES = {
         "💬 <b>Техническая поддержка</b>\n\n"
         #"🕐 Работаем круглосуточно, без выходных\n"
         #"⚡ Среднее время ответа: 5 минут\n\n"
-        "📱 Способы связи:\n"
-        "• Telegram: @{support_username}\n"
-        "• Discord: @{support_username}\n\n"
+        "📱 Telegram: @{support_username} (отвечает человек)\n"
         #"• Email: support@vpnbot.ru\n"
         #"• Чат в боте (кнопка ниже)\n\n"
         #"🆘 Частые проблемы:\n"
@@ -268,10 +266,10 @@ MESSAGES = {
 
 IMAGES = {
     # Keys should match MESSAGES keys where an image is desired
-    "welcome": "https://cdn-icons-png.flaticon.com/512/3799/3799863.png",  # Example welcome image
-    "profile_info": "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",  # Example profile image
-    "help": "https://cdn-icons-png.flaticon.com/512/471/471664.png",  # Example help image
-    "support_info": "https://cdn-icons-png.flaticon.com/512/1067/1067566.png",  # Example support image
+    # "welcome": "https://cdn-icons-png.flaticon.com/512/3799/3799863.png",  # Example welcome image
+    # "profile_info": "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",  # Example profile image
+    # "help": "https://cdn-icons-png.flaticon.com/512/471/471664.png",  # Example help image
+    # "support_info": "https://cdn-icons-png.flaticon.com/512/1067/1067566.png",  # Example support image
 }
 
 
