@@ -46,12 +46,12 @@
     "{emoji} {name} {popular_badge}",
     "💰 {price} ₽ ({price_per_month} ₽/мес)",
     "⏰ {duration} дней",
-    "📝 {description}",
+    "{description}",
     "💎 {savings}"
   ],
   "popular_badge": "🔥 ПОПУЛЯРНЫЙ",
   "best_deal_badge": "💎 ЛУЧШЕЕ ПРЕДЛОЖЕНИЕ",
-  "choose_plan": "👆 Выборите плана захвата Польши:",
+  "choose_plan": "👆 Выберите плана захвата Польши:",
   "payment_methods": [
     "💳 Способы оплаты для плана \"{plan_name}\":",
     "",

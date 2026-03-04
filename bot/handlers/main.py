@@ -270,7 +270,7 @@ async def show_plans(callback_query: CallbackQuery, session, state: FSMContext) 
             savings=savings,
         )
 
-    message_text += get_message("choose_plan")
+    message_text += "\n\n" + get_message("choose_plan")
 
     builder = InlineKeyboardBuilder()
     for plan_id, plan in SUBSCRIPTION_PLANS.items():
