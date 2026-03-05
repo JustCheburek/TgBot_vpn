@@ -263,13 +263,11 @@ async def show_plans(callback_query: CallbackQuery, session, state: FSMContext) 
         months = plan["duration_days"] // 30
         price_per_month = format_price_per_month(plan["price"], months)
         savings = format_savings(plan["price"], base_month_price, months)
-        popular_badge = get_message("popular_badge") if plan.get("popular") else ""
 
         message_text += get_message(
             "plan_template",
             emoji=plan["emoji"],
             name=plan["name"],
-            popular_badge=popular_badge,
             price=plan["price"],
             price_per_month=price_per_month,
             duration=plan["duration_days"],

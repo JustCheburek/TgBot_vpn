@@ -46,16 +46,6 @@ YOOMONEY_TOKEN=your_yoomoney_token
 VPN_SERVER_URL=your_vpn_server.com
 ```
 
-### 4. Test and Run
-
-```bash
-# Validate setup
-python validate_bot.py
-
-# Run the bot
-python bot/main.py
-```
-
 ## 🔧 Configuration Options
 
 ### Bot Settings
@@ -181,8 +171,7 @@ sqlite3 vpn_bot.db
 ### Getting Help
 
 1. Check logs in `logs/bot.log`
-2. Run `python validate_bot.py` for diagnostics
-3. Verify configuration in `.env` file
+2. Verify configuration in `.env` file
 
 ## 🚀 Production Deployment
 

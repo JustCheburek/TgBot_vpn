@@ -22,24 +22,7 @@ nano .env
 
 ### 3️⃣ Запустите бота
 ```bash
-python start_bot.py
-```
-
-## 🛠️ Альтернативные способы запуска
-
-### Прямой запуск
-```bash
-python bot/main.py
-```
-
-### Демонстрация
-```bash
-python demo_bot.py
-```
-
-### Тестирование настройки
-```bash
-python test_setup.py
+python main.py
 ```
 
 ## ❓ Частые проблемы

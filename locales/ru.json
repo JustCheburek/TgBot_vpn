@@ -41,14 +41,12 @@
   ],
   "plans_header": ["🎯 Выберите свой план побега из Чебурнета:"],
   "plan_template": [
-    "{emoji} {name} {popular_badge}",
+    "{emoji} {name}",
     "💰 {price} ₽ ({price_per_month} ₽/мес)",
     "⏰ {duration} дней",
     "{description}",
     "💎 {savings}"
   ],
-  "popular_badge": "🔥 ВЫБОР МАКСА",
-  "best_deal_badge": "💎 ТУПО МЁД",
   "choose_plan": "👆 Выберите дозировку speed VPN:",
   "payment_methods": [
     "💳 Способы оплаты для плана \"{plan_name}\":",
