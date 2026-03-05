@@ -23,6 +23,8 @@ def _load_messages() -> dict:
 
 
 MESSAGES = _load_messages()
+SUBSCRIPTION_PLANS = MESSAGES.get("SUBSCRIPTION_PLANS", {})
+PAYMENT_METHODS = MESSAGES.get("PAYMENT_METHODS", {})
 
 
 IMAGES = {
@@ -45,7 +47,7 @@ def get_message(key: str, **kwargs) -> str:
     if kwargs:
         try:
             return message.format(**kwargs)
-        except (KeyError, ValueError) as e:
+        except (KeyError, ValueError):
             # Return message without formatting if there's an error
             return message
     return message

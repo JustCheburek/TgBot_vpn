@@ -12,6 +12,7 @@ from bot.handlers.main import router as main_router
 from bot.handlers.admin import router as admin_router
 from bot.middlewares.db import DbSessionMiddleware
 from bot.utils.helpers import setup_logging
+from locales.ru import get_message
 
 # Configure logging
 setup_logging(Config.LOG_LEVEL)
@@ -49,13 +50,14 @@ async def main() -> None:
         logger.info(f"Bot started: @{bot_info.username}")
 
         # Send startup message to admins
-        startup_message = (
-            "🤖 <b>VPN Bot запущен успешно!</b>\n\n"
-            f"🆔 Бот: @{bot_info.username}\n"
-            f"📅 Время запуска: {logging.Formatter().formatTime(logging.LogRecord('', 0, '', 0, '', (), None))}\n"
-            f"⚙️ Режим отладки: {'✅' if Config.DEBUG else '❌'}\n"
-            f"🗄️ База данных: {'✅ Подключена' if db_manager else '❌ Ошибка'}\n\n"
-            "🎯 Бот готов к работе с пользователями!"
+        startup_message = get_message(
+            "startup_message",
+            bot_username=bot_info.username,
+            time=logging.Formatter().formatTime(
+                logging.LogRecord("", 0, "", 0, "", (), None)
+            ),
+            debug_mode="✅" if Config.DEBUG else "❌",
+            db_status="✅ Подключена" if db_manager else "❌ Ошибка",
         )
 
         # Notify admins

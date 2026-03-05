@@ -16,7 +16,15 @@ from aiogram.types import (
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from bot.models.database import DatabaseManager, User, Subscription, Payment
-from bot.config.settings import Config, SUBSCRIPTION_PLANS, PAYMENT_METHODS
+from bot.config.settings import Config
+from locales.ru import (
+    get_message,
+    get_image,
+    format_price_per_month,
+    format_savings,
+    SUBSCRIPTION_PLANS,
+    PAYMENT_METHODS,
+)
 from bot.utils.helpers import (
     generate_referral_code,
     format_date,
@@ -30,7 +38,6 @@ from bot.utils.helpers import (
     calculate_referral_bonus,
 )
 from bot.utils.payments import payment_manager, PaymentError
-from locales.ru import get_message, get_image, format_price_per_month, format_savings
 
 logger = logging.getLogger(__name__)
 
@@ -247,7 +254,7 @@ async def show_plans(callback_query: CallbackQuery, session, state: FSMContext) 
     await state.clear()
     await state.set_state(PurchaseStates.selecting_plan)
 
-    message_text = get_message("plans_header")
+    message_text = get_message("plans_header") + "\n\n"
 
     # Add each plan info with enhanced formatting
     base_month_price = SUBSCRIPTION_PLANS["1_month"]["price"]
