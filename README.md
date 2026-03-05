@@ -64,7 +64,7 @@ source venv/bin/activate  # Linux/Mac
 venv\Scripts\activate  # Windows
 
 # Устанавливаем зависимости
-pip install -r requirements.txt
+pip install .
 ```
 
 ### 2. Настройка конфигурации
@@ -191,7 +191,7 @@ python main.py
 git pull origin main
 
 # Обновляем зависимости
-pip install -r requirements.txt
+pip install .
 
 # Перезапускаем бота
 python bot/main.py
@@ -204,7 +204,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install .
 
 COPY . .
 CMD ["python", "bot/main.py"]

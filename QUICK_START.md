@@ -4,7 +4,7 @@
 
 ### 1️⃣ Установите зависимости
 ```bash
-python install_dependencies.py
+pip install .
 ```
 
 ### 2️⃣ Настройте конфигурацию
@@ -30,7 +30,7 @@ python main.py
 ### Ошибка "ModuleNotFoundError: No module named 'telegram'"
 **Решение:** Установите зависимости
 ```bash
-pip install -r requirements.txt
+pip install .
 ```
 
 ### Ошибка "BOT_TOKEN is required"

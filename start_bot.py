@@ -54,7 +54,7 @@ def check_dependencies():
         return True
     except ImportError:
         print("❌ python-telegram-bot не установлен")
-        print("💡 Запустите: python install_dependencies.py")
+        print("💡 Запустите: pip install .")
         return False
 
 
@@ -128,7 +128,7 @@ def main():
         print(f"\n❌ Ошибка запуска: {e}")
         print("\n🔧 Попробуйте:")
         print("1. Проверить .env файл")
-        print("2. Переустановить зависимости: python install_dependencies.py")
+        print("2. Переустановить зависимости: pip install .")
         print("3. Запустить напрямую: python bot/main.py")
         return False
 
